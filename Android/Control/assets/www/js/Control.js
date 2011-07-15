@@ -79,7 +79,6 @@ Control.prototype.removeWidgetWithName = function(widgetName) {
 		for(var j = 0; j < control.pages[page].length; j++) {
 			var widget = control.pages[page][j];
 			if(widget.name == widgetName) {
-                console.log("widget found!");
                 control.pages[page].splice(j,1);
                 widget = null;
 			}
@@ -320,11 +319,13 @@ Control.prototype.event = function(event) {
         // console.log("touch id:: " + touch.identifier + " || x = " + touch.pageX + " || y = " + touch.pageY);
 	}
 	//console.log("length = " + control.pages[page].length);
-	for(var i = 0; i < control.pages[page].length; i++) {
-		var widget = control.pages[page][i];
-		//console.log("widget event for " + widget.name);
-		widget.event(event);
-	}
+	if(typeof control.pages[page] != "undefined") {
+	    for(var i = 0; i < control.pages[page].length; i++) {
+    		var widget = control.pages[page][i];
+    		//console.log("widget event for " + widget.name);
+    		widget.event(event);
+    	}
+    }
 	
 	for(var i = 0; i < control.constants.length; i++) {
 		var widget = control.constants[i];
@@ -355,8 +356,15 @@ Control.prototype.changeTab = function(tab) {
       }
 	  if(oldTab.id == "selectedInterface") {
 		control.unloadWidgets();
+		$("#SelectedInterfacePage").css({
+                            'width':  0,
+                            'height': 0,
+                            'display': 'block',
+                            'top':  0,
+                            'left': 0
+                        });
 		//if(device.platform == 'iPhone') 
-          PhoneGap.exec(null,null,"DeviceFeatures","setOrientation", ["portrait"]);
+          PhoneGap.exec(null,null,"DeviceFeatures","setOrientation2", ["portrait"]); //setOrientation2 doesn't call into interfaceManager after loading widgets
 		//window.plugins.nativeControls.showTabBar({"orientation":"portrait",  "position":"bottom"});
 	  }
     }
