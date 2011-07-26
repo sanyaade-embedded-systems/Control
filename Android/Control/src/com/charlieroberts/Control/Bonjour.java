@@ -72,21 +72,35 @@ public class Bonjour extends Plugin {
 	@Override
 	public PluginResult execute(String action, JSONArray data, String callbackId) {
 	    //Log.d("OSCManager", "executing something " + action);	
-		System.out.println("EXECUTING BONJOUR ********************************************");
 		PluginResult result = null;
-		if (action.equals("start") || action.equals("browse")) {
-		    System.out.println("STARTING BONJOUR ********************************************");
+	    try {
+		    System.out.println("EXECUTING BONJOUR ********************************************");
+    		if (action.equals("start") || action.equals("browse")) {
+    		    System.out.println("STARTING BONJOUR ********************************************");
 		    
-            ServiceInfo[] infos = jmdns.list("_osc._udp.local.");
-            for (int i = 0; i < infos.length; i++) {
-                String jsString = "javascript:destinationManager.addDestination('" + infos[i].getHostAddress() + "'," + infos[i].getPort() + ", 0, 0);";
-                System.out.println(jsString);
-                webView.loadUrl(jsString);
-                System.out.println("after sending to js");
-            }
-	    }
+                ServiceInfo[] infos = jmdns.list("_osc._udp.local.");
+                for (int i = 0; i < infos.length; i++) {
+                    String jsString = "javascript:destinationManager.addDestination('" + infos[i].getHostAddress() + "'," + infos[i].getPort() + ", 0, 0);";
+                    System.out.println(jsString);
+                    webView.loadUrl(jsString);
+                    System.out.println("after sending to js");
+                }
+                if(action.equals("start")) {
+                    ServiceInfo serviceInfo = ServiceInfo.create("_osc._udp.local.",
+                                 "Control_" + (Math.round(Math.random() * 100000)), 8080,
+                                 "OSC reception for device running Control");
+                    jmdns.registerService(serviceInfo);
+                }
+    	    }
+    	} catch (Exception e) {
+            System.out.println("after sending to js");
+    	}
 		return result;
 	}
+	
+	// TODO: where do I call this? how do plugins get deconstructed?
+    // jmdns.unregisterAllServices();
+    // jmdns.close();
 	
 	public String getLocalIpAddress() {
         try {

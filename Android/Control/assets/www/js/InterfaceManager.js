@@ -2,15 +2,14 @@
 
 function InterfaceManager() {
     this.init = function() {
-        console.log("INTERFACE MANAGER INIT");
         this.selectedListItem = 0;
-        //this.interfaceFiles = new Lawnchair('interfaceFiles');
-        //if (!localStorage.interfaceFiles)       localStorage.interfaceFiles = JSON.stringify([]);
-        //if (!localStorage.shouldLoadInterfaces) localStorage.shouldLoadInterfaces = JSON.stringify(true);
+
         this.currentInterfaceName = null;
         this.currentInterfaceJSON = null;
+        
         this.interfaceIP = null;
         constants = null;
+        
         this.interfaceDefaults = [
         "multiXY.js",
         "iphoneLandscapeMixer.js",
@@ -22,20 +21,19 @@ function InterfaceManager() {
         "gyro.js",
         //"spacetime.js",
         ];
-        window.shouldReadFiles = true;
-        window.isLoadingInterfaces = false;
-        // stops database calls from being executed twice, for some reason "get" returns two values.
+
         control.ifCount = 0;
         if(!localStorage.interfaceFiles) {
             this.loadedInterfaces = [];
-            this.loadScripts();
+            PhoneGap.exec(null, null, "DeviceFeatures", "print", ["INIT LOADING SCRIPTS"]);
+            var msg = "now loading default interfaces. this will only happen the first time the app is launched (possibly also after updates) and takes about 8 seconds";
+            navigator.notification.alert(msg, null, "loading");
+            setTimeout(function() {interfaceManager.loadScripts();}, 1000);
         }else{
             PhoneGap.exec(null, null, "DeviceFeatures", "print", ["NOT RELOADING"]);
-            
             this.loadedInterfaces = JSON.parse(localStorage.interfaceFiles);
             this.createInterfaceListWithArray(this.loadedInterfaces);
         }
-
     }
     
     this.loadScripts = function() {
@@ -43,14 +41,14 @@ function InterfaceManager() {
         
         var fileref = document.createElement('script')
         fileref.setAttribute("type", "text/javascript");
-        fileref.setAttribute("src", "interfaces/" + this.interfaceDefaults[control.ifCount]);
+        fileref.setAttribute("src", "interfaces/" + interfaceManager.interfaceDefaults[control.ifCount]);
         document.getElementsByTagName('head')[0].appendChild(fileref);
             
         window.setTimeout(function() {
             if(control.ifCount < interfaceManager.interfaceDefaults.length) {
                 eval(window.interfaceString);
-                //PhoneGap.exec(null, null, "DeviceFeatures", "print", ["ARHAIRH" + window.interfaceString]);
-                PhoneGap.exec(null, null, "DeviceFeatures", "print", [loadedInterfaceName]);                
+                // PhoneGap.exec(null, null, "DeviceFeatures", "print", ["ARHAIRH" + window.interfaceString]);
+                PhoneGap.exec(null, null, "DeviceFeatures", "print", ["loading " + loadedInterfaceName + " ....................................."]);                
                 
                 interfaceManager.loadedInterfaces[control.ifCount] = {'name':loadedInterfaceName, 'json':window.interfaceString};
                 control.ifCount++;
@@ -59,96 +57,78 @@ function InterfaceManager() {
                 interfaceManager.createInterfaceListWithArray(interfaceManager.loadedInterfaces);
                 localStorage.interfaceFiles = JSON.stringify(interfaceManager.loadedInterfaces);
             }
-        }, 350);
+        }, 1000);
     }
-        
-        // PhoneGap.exec(null, null, "DeviceFeatures", "print", ["LOADING ******************************************************************"]);
-        //        
-        //        window.setTimeout(function() {
-        //            // needs a timeout for the Lawnchair database to be initialized... ARGGGGHHHH
-        //            //interfaceManager.shouldLoadInterfaces.get("shouldLoad",
-        //            //function(r) {
-        //                PhoneGap.exec(null, null, "DeviceFeatures", "print", ["INSIDE SHOULD LOAD"]);
-        //                if (!window.isLoadingInterfaces) {
-        //                    //if (r != null)
-        //                    window.shouldReadFiles = true;
-        //                    // this means that Control has been launched before, so we should load the interfaces into the database
-        //                    if (window.shouldReadFiles) {
-        //                        control.ifCount = 0;
-        //                        // interfaceManager.shouldLoadInterfaces.save({
-        //                        //                             key: "shouldLoad",
-        //                        //                             sl: true
-        //                        //                         });
-        //                        interfaceManager.readFile(interfaceManager.interfaceDefaults[control.ifCount]);
-        //                    } else {
-        //                        interfaceManager.createInterfaceListWithStoredInterfaces();
-        //                    }
-        //                    window.isLoadingInterfaces = true;
-        //                }
-        //            //})
-        //        },
-        //        3000);
-        //        PhoneGap.exec(null, null, "DeviceFeatures", "print", ["AFTER LOADING ******************************************************************"]);
-        
-    //}
-
-    this.readFile = function(filename) {
-        PhoneGap.exec(null, null, "DeviceFeatures", "print", ["LOADING " + filename]);
-        var fileref = document.createElement('script')
-        fileref.setAttribute("type", "text/javascript");
-        fileref.setAttribute("src", "interfaces/" + filename);
-        document.getElementsByTagName('head')[0].appendChild(fileref);
-
-        setTimeout(function() {
-            interfaceManager.saveInterface(window.interfaceString, false);
-            control.ifCount++;
-            if (control.ifCount < interfaceManager.interfaceDefaults.length) {
-                interfaceManager.readFile(interfaceManager.interfaceDefaults[control.ifCount]);
-            } else {
-                interfaceManager.createInterfaceListWithStoredInterfaces();
-            }
-        },
-        500);
-    }
-    this.rotationSet = function() {
-        var r = 1;
-        if (screen.width < screen.height)
-        r = 320 / screen.width;
-        else
-        r = 320 / screen.height;
-
+    // assumes portrait; _width will always be less than _height
+    this.rotationSet = function(_width, _height) {
         //control.makePages(pages, screen.width * r, screen.height * r);
         PhoneGap.exec(null, null, "DeviceFeatures", "getScale", []);
         //PhoneGap.exec(null, null, "DeviceFeatures", "print", ["h:" + screen.height + " || w: " + screen.width]);
         PhoneGap.exec(null, null, "DeviceFeatures", "print", ["pixelRatio = " + window.devicePixelRatio]);
+        var r = 1 / window.devicePixelRatio;
+        var w, h;
+            // change w / h depending on orientation
+        if(control.orientationString == "portrait") {
+            w = _width; h = _height;
+        }else{
+            w = _height; h = _width;
+        }   
+        // froyo / gingerbread
+        //console.log("DEVICE VERSION = " + device.version);
+        if(parseFloat(device.version) >= 2.2 && parseFloat(device.version) < 3.0) {
+            //console.log("inside froyo / gingerbread");
+            //console.log("width = " + _width + " height = " + _height);
+            //console.log("ORIENTATION = " + control.orientationString);
+            // if(control.orientationString == "portrait") {
+            //                 //$("#SelectedInterfacePage").css( {'width': _width * r + "px", 'height' : _height * r + "px"} );
+            //             }else{
+            //                 //$("#SelectedInterfacePage").css({'width': _width * r + "px", 'height' : _height * r + "px"});
+            //                 $("#SelectedInterfacePage").css({'width': "320px", 'height' : "320px"});
+            //             }
+            // if(control.orientationString == "landscape") {
+            //                 $("#SelectedInterfacePage").css({'height' : "320px !important"});
+            //             }else{
+            //                 $("#SelectedInterfacePage").css({'height' : "100% !important"});
+            //             }
+            //control.makePages(pages, _width * r, _height * r);
 
-
-        console.log("SCALE = " + window.interfaceManager.scale);
-        console.log("WINDOW DPI = " + window.devicePixelRatio);
-        r = 1 / window.devicePixelRatio;
+            // $("#SelectedInterfacePage").css({
+            //                         'width':  w  + 'px',
+            //                         'height': h  + 'px',
+            //             });
         
-        $("#SelectedInterfacePage").css({
-                            'width':  screen.width  * r + 'px',
-                            'height': screen.height * r + 'px',
-                            'display': 'block',
-                            'top':  0,
-                            'left': 0
-        });
+            control.makePages(pages, w * r, h * r);
+            if(control.orientationString == "portrait") {
+                $("#SelectedInterfacePage").css({ 'height' : '100% !important'});
+            }else{
+                $("#SelectedInterfacePage").css({ 'height' : "320px !important"});
+            }
+        }else{ // android 2.1 / honeycomb
+            // "height" must always be 320
+            if(control.orientationString == "portrait") {
+                $("#SelectedInterfacePage").css( {'width': _width * r, 'height' : _height * r} );
+            }else{
+                $("#SelectedInterfacePage").css({'width': _height * r, 'height' : _width * r});
+            }
+            
+            control.makePages(pages, screen.width * r, screen.height * r);
+            PhoneGap.exec(null, null, "DeviceFeatures", "print", ["interface height = " + $("#SelectedInterfacePage").css("height")]);
+        }
 
-        control.makePages(pages, screen.width * r, screen.height * r);
-        //control.makePages(pages, screen.width, screen.height);
         if (constants != null) {
             control.loadConstants(constants);
         }
 
         control.loadWidgets();
 
-        if (this.currentTab != document.getElementById("selectedInterface")) {
-            control.changeTab(document.getElementById("selectedInterface"));
+        if (control.currentTab != document.getElementById("SelectedInterfacePage")) {
+            control.changeTab(document.getElementById("SelectedInterfacePage"));
             $.mobile.changePage('#SelectedInterfacePage');
         }
+        control.isLoadingInterface = false;
+//        PhoneGap.exec(null, null, "DeviceFeatures", "print", ["interface height = " + $("#SelectedInterfacePage").css("height")]);      
     }
-
+    
     this.promptForInterfaceDownload = function() {
         var interfacesDiv = document.getElementById("Interfaces");
         var promptDiv = document.createElement("div");
@@ -204,8 +184,9 @@ function InterfaceManager() {
         console.log("downloading...");
         interfaceManager.myRequest = new XMLHttpRequest();
         var loadedInterfaceName = null;
+        PhoneGap.exec(null, null, "DeviceFeatures", "print", ["starting download ....................................."]);  
         interfaceManager.myRequest.onreadystatechange = function() {
-            console.log("downloading..." + interfaceManager.myRequest.readyState);
+        PhoneGap.exec(null, null, "DeviceFeatures", "print", ["downloading stage " + interfaceManager.myRequest.readyState]);
             if (interfaceManager.myRequest.readyState == 4) {
                 console.log(interfaceManager.myRequest.responseText);
                 eval(interfaceManager.myRequest.responseText);
@@ -223,6 +204,7 @@ function InterfaceManager() {
             }
         }
         interfaceManager.myRequest.ipAddress = ipAddress;
+        interfaceManager.ipAddress = ipAddress;
         //interfaceManager.myRequest.withCredentials = "true";
         interfaceManager.myRequest.open("GET", ipAddress, true);
         interfaceManager.myRequest.send(null);
@@ -245,10 +227,10 @@ function InterfaceManager() {
         $('#interfaceList').empty();
         PhoneGap.exec(null, null, "DeviceFeatures", "print", ["WTF?????????????"]);            
         
-        interfaceManager.interfaceFiles.all(function(r) {
-            PhoneGap.exec(null, null, "DeviceFeatures", "print", ["RETRIEVED INTERFACE ARRAY PASSING TO LIST CREATION"]);            
-            interfaceManager.createInterfaceListWithArray(r);
-        });
+        //interfaceManager.interfaceFiles.all(function(r) {
+        //    PhoneGap.exec(null, null, "DeviceFeatures", "print", ["RETRIEVED INTERFACE ARRAY PASSING TO LIST CREATION"]);            
+            interfaceManager.createInterfaceListWithArray(interfaceManager.loadedInterfaces);
+        //});
         PhoneGap.exec(null, null, "DeviceFeatures", "print", ["WTF?????????????"]);                    
         window.isLoadingInterfaces = false;
     }
@@ -277,7 +259,6 @@ function InterfaceManager() {
     }
 
     this.editInterfaceList = function() {
-
         var list = document.getElementById('interfaceList');
 
         if (list.childNodes.length > 0) {
@@ -305,26 +286,52 @@ function InterfaceManager() {
         for (var i = 0; i < list.childNodes.length; i++) {
             var item = list.childNodes[i];
             item.removeChild(item.childNodes[0]);
-            item.setAttribute("ontouchend", "interfaceManager.highlight(" + i + "); interfaceManager.selectInterfaceFromList('" + item.innerHTML + "');");
+            item.setAttribute("ontouchend", "interfaceManager.highlight(" + i + "); interfaceManager.selectInterfaceFromList('" + i + "');");
         }
     }
 
     this.refreshInterface = function() {
         interfaceManager.myRequest = new XMLHttpRequest();
         interfaceManager.myRequest.onreadystatechange = function() {
+            // PhoneGap.exec(null, null, "DeviceFeatures", "print", ["downloading stage " + interfaceManager.myRequest.readyState]);            
             if (interfaceManager.myRequest.readyState == 4) {
                 interfaceManager.runInterface(interfaceManager.myRequest.responseText);
-                interfaceManager.interfaceFiles.save({
-                    key: interfaceManager.currentInterfaceName,
-                    json: interfaceManager.myRequest.responseText,
-                    address: interfaceManager.interfaceIP
-                });
+                for(var i = 0; i < interfaceManager.loadedInterfaces.length; i++) {
+                    var interface = interfaceManager.loadedInterfaces[i];
+                    if(interface.name == interfaceManager.currentInterfaceName) {
+                        // PhoneGap.exec(null, null, "DeviceFeatures", "print", ["SHOULD BE LOADED"]);
+                        var newInterface = {
+                            name:interfaceManager.currentInterfaceName,
+                            json: interfaceManager.myRequest.responseText,
+                            address: interfaceManager.interfaceIP
+                        };
+                        // PhoneGap.exec(null, null, "DeviceFeatures", "print", [newInterface.json]);
+                        interfaceManager.loadedInterfaces.splice(i,1,newInterface);
+                        interfaceManager.runInterface(newInterface.json);
+                        break;
+                    }
+                }
             }
         }
-        //interfaceManager.myRequest.withCredentials = "true";
         interfaceManager.myRequest.open("GET", interfaceManager.interfaceIP, true);
         interfaceManager.myRequest.send(null);
-
+    }
+    
+    this.removeInterface = function(itemNumber) {        
+        var listItem = $('#interfaceList > li:eq(' + itemNumber + ')');
+        var arr = listItem.html().split("</div>");
+        var newKey = arr[1];
+        for(var i = 0; i < interfaceManager.loadedInterfaces.length; i++) {
+            var interface = interfaceManager.loadedInterfaces[i];
+            PhoneGap.exec(null, null, "DeviceFeatures", "print", ["Key = " + newKey + " :: interface.name = " + interface.name]);
+            if(interface.name == newKey) {
+                interfaceManager.loadedInterfaces.splice(i,1);
+                listItem.remove();
+                localStorage.interfaceFiles = JSON.stringify(interfaceManager.loadedInterfaces);
+                //$('#interfaceList').listview('refresh');
+                break;
+            }
+        }
     }
 
     this.saveInterface = function(interfaceJSON, shouldReloadList, ipAddress) {
@@ -334,20 +341,17 @@ function InterfaceManager() {
         eval(interfaceJSON);
         PhoneGap.exec(null, null, "DeviceFeatures", "print", ["SAVING"]);
         if (loadedInterfaceName != null) {
-            //interfaceManager.interfaceFiles.remove(loadedInterfaceName,
-            interfaceManager.interfaceFiles.save({
-                key: loadedInterfaceName,
-                json: interfaceJSON,
+            interfaceManager.loadedInterfaces.push({
+                name:    loadedInterfaceName,
+                json:    interfaceJSON,
                 address: ipAddress
-            },
-            function(r) {
-                //console.log("interface saved");
-                PhoneGap.exec(null, null, "DeviceFeatures", "print", ["SAVING " + r.key]);                            
-                if (shouldReloadList)
+            });
+            
+            localStorage.interfaceFiles = JSON.stringify(interfaceManager.loadedInterfaces);
+            
+            if (shouldReloadList) {
                 interfaceManager.createInterfaceListWithStoredInterfaces();
             }
-            )
-            //);
         }
     }
 
@@ -371,62 +375,38 @@ function InterfaceManager() {
             var loadedInterfaceName = null;
             interfaceManager.runInterface(interfaceJSON);
             this.saveInterface(interfaceJSON, false);
-
         }
-
-    }
-
-    this.removeInterface = function(itemNumber) {
-        var listItem = $('#interfaceList > li:eq(' + itemNumber + ')');
-        var arr = listItem.html().split("</div>");
-        var newKey = arr[1];
-        interfaceManager.interfaceFiles.remove(newKey);
-        //console.log("removing " + newKey);
-        listItem.remove();
-        $('#interfaceList').listview('refresh');
     }
 
     this.runInterface = function(json) {
-        control.unloadWidgets();
-        constants = null;
-        pages = null;
+        if(!control.isLoadingInterface) {
+            control.unloadWidgets();
+            constants = null;
+            pages = null;
 
-        oscManager.delegate = oscManager;
-        midiManager.delegate = midiManager;
+            oscManager.delegate = oscManager;
+            midiManager.delegate = midiManager;
 
-        eval(json);
+            eval(json);
 
-        this.currentInterfaceName = loadedInterfaceName;
-        this.currentInterfaceJSON = json;
+            this.currentInterfaceName = loadedInterfaceName;
+            this.currentInterfaceJSON = json;
 
-        if (typeof interfaceOrientation != "undefined") {
-            control.orientationString = interfaceOrientation;
-            console.log("ROTATING ****************************" + interfaceOrientation);
-            PhoneGap.exec(null, null, "DeviceFeatures", "setOrientation", [interfaceOrientation]);
+            if (typeof interfaceOrientation != "undefined") {
+                control.orientationString = interfaceOrientation;
+                //console.log("ROTATING ****************************" + interfaceOrientation);
+                PhoneGap.exec(null, null, "DeviceFeatures", "setOrientation", [interfaceOrientation]); // the plugin calls the rotationSet method after it's finished rotating which loads in widgets, sets screen resolution etc.
+            }
+            control.isLoadingInterface = true;
         }
-        //if(control.orientation == 0 || control.orientation == 180) {
-        // if(interfaceOrientation == "portrait") {
-        //             control.makePages(pages, screen.width, screen.height);
-        //         }else{
-        //             control.makePages(pages, screen.height, screen.width);
-        //         }
-        //
-        //         if(constants != null) {
-        //             control.loadConstants(constants);
-        //         }
-        //         control.loadWidgets();
-        //         if(this.currentTab != document.getElementById("selectedInterface")) {
-        //             control.changeTab(document.getElementById("selectedInterface"));
-        //             $.mobile.changePage('#SelectedInterfacePage');
-        //        }
     }
-    //
+
     this.selectInterfaceFromList = function(interfaceNumber) {
         var r = interfaceManager.loadedInterfaces[interfaceNumber];
         
         if (typeof r.address != "undefined")
             interfaceManager.interfaceIP = r.address;
-            
+        
         interfaceManager.runInterface(r.json);
     }
 
